@@ -9,14 +9,11 @@
 #define COLS (SCREEN_W / SQ_W)
 #define ROWS (SCREEN_H / SQ_W)
 
-#define CHAR_EMPTY  ' '
-#define CHAR_WALL   'W'
-#define CHAR_PLAYER 'P'
-#define CHAR_FINISH 'F'
-
-struct Player {
-    int x,y;
-} player;
+#define CHAR_EMPTY    ' '
+#define CHAR_WALL     'W'
+#define CHAR_PLAYER   'P'
+#define CHAR_MONSTER  'M'
+#define CHAR_FINISH   'F'
 
 typedef struct {
     int dx,dy;
@@ -31,20 +28,30 @@ typedef struct {
     Uint8 r,g,b;
 } Colour;
 
-const Colour grey = { 0xCC, 0xCC, 0xCC };
-const Colour cyan = { 0x00, 0xFF, 0xFF };
-const Colour red  = { 0xFF, 0x00, 0x00 };
+const Colour grey   = { 0xCC, 0xCC, 0xCC };
+const Colour cyan   = { 0x00, 0xFF, 0xFF };
+const Colour yellow = { 0xFF, 0xFF, 0x00 };
+const Colour red    = { 0xFF, 0x00, 0x00 };
+
+struct Player {
+    int x,y;
+} player;
+
+struct Monster {
+    int x,y;
+    const Move *dir;
+} monster;
 
 char grid[COLS][ROWS] = {};
 bool game_end;
 
 const char* map[] = { // 32x24
     "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
-    "W                              W",
+    "W P                            W",
     "WWWW              WWW   WWW  WWW",
     "WWWW      WW      W WW   WWW  WW",
     "W  WWWWWWWWW                  WW",
-    "WW         W                   W",
+    "WW         W         M         W",
     "WWWWWWWWWW WWW                 W",
     "WWWWWWWWWW WWWWWW              W",
     "W                            WWW",
@@ -71,7 +78,9 @@ struct Gpu {
     SDL_Texture* texture;
 } gpu;
 
-void init_map() {
+void init_game() {
+    printf("Initialising game ...\n");
+
     memset(&grid, 0, sizeof grid);
 
     for (int r = 0; r < ROWS; r++) {
@@ -83,6 +92,14 @@ void init_map() {
                 case CHAR_FINISH:
                     grid[c][r] = cell;
                     break;
+                case CHAR_PLAYER:
+                    player.x = c;
+                    player.y = r;
+                    break;
+                case CHAR_MONSTER:
+                    monster.x = c;
+                    monster.y = r;
+                    break;
                 default:
                     printf("Invalid map data!\n\n");
                     printf("Error: invalid char: '%c' at %d,%d\n\n", cell, r, c);
@@ -90,31 +107,19 @@ void init_map() {
             }
         }
     }
-}
-
-void init_player() {
-    // Find first empty map cell.
-    for (int c = 0; c < COLS; c++) {
-        for (int r = 0; r < ROWS; r++) {
-            if (grid[c][r] == CHAR_EMPTY) {
-                player.x = c;
-                player.y = r;
-                return;
-            }
-        }
-    }
-
-    printf("Error: no empty map cells\n");
-    exit(1);
-}
-
-void init_game() {
-    printf("Initialising game ...\n");
-
-    init_map();
-    init_player();
 
     game_end = false;
+}
+
+const Move* inv_move(const Move* m) {
+    if (m == &mv_left)
+        return &mv_right;
+    else if (m == &mv_right)
+        return &mv_left;
+    else if (m == &mv_up)
+        return &mv_down;
+    else if (m == &mv_down)
+        return &mv_up;
 }
 
 void update_player(const Move* m) {
@@ -175,6 +180,12 @@ void draw_grid() {
                     case CHAR_WALL:
                         draw_rect(i, j, &grey);
                         break;
+                    case CHAR_MONSTER:
+                        draw_rect(i, j, &yellow);
+                        break;
+                    case CHAR_PLAYER:
+                        draw_rect(i, j, &cyan);
+                        break;
                     case CHAR_FINISH:
                         draw_rect(i, j, &red);
                         break;
@@ -188,6 +199,10 @@ void draw_player() {
     draw_rect(player.x, player.y, &cyan);
 }
 
+void draw_monster() {
+    draw_rect(monster.x, monster.y, &yellow);
+}
+
 void render() {
     SDL_SetRenderTarget(gpu.renderer, gpu.texture);
 
@@ -195,13 +210,45 @@ void render() {
     SDL_SetRenderDrawColor(gpu.renderer, 0x00, 0x00, 0x00, 0x00);
     SDL_RenderClear(gpu.renderer);
 
-    draw_grid();
-    draw_player();
+    if (!game_end) {
+        draw_grid();
+        draw_player();
+        draw_monster();
+    } else {
+        draw_grid();
+    }
 
     // Draw to screen.
     SDL_SetRenderTarget(gpu.renderer, NULL);
     SDL_RenderCopy(gpu.renderer, gpu.texture, NULL, NULL);
     SDL_RenderPresent(gpu.renderer);
+}
+
+void move_monster() {
+    if (monster.dir == NULL)
+        monster.dir = &mv_left;
+
+    int x = monster.x + monster.dir->dx;
+    int y = monster.y + monster.dir->dy;
+
+    if (grid[x][y] == CHAR_WALL) {
+        monster.dir = inv_move(monster.dir);
+    } else {
+        monster.x = x;
+        monster.y = y;
+    }
+}
+
+void check_collision() {
+    if (monster.x == player.x && monster.y == player.y) {
+        game_end = true; // Lose!
+        memset(grid, CHAR_MONSTER, sizeof grid);
+    }
+}
+
+void update_world() {
+    move_monster();
+    check_collision();
 }
 
 void init_gpu() {
@@ -252,6 +299,7 @@ int main(int argc, char *argv[]) {
         const uint8_t* event = SDL_GetKeyboardState(NULL);
         move(event);
 
+        update_world();
         render();
 
         // Restart.
