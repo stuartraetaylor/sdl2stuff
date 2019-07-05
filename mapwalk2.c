@@ -173,23 +173,19 @@ void draw_rect(int col, int row, const Colour* c) {
 void draw_grid() {
     for (int i=0; i < COLS; i++) {
         for (int j=0; j < ROWS; j++) {
-            char cell = grid[i][j];
-
-            if (cell > 0) {
-                switch (cell) {
-                    case CHAR_WALL:
-                        draw_rect(i, j, &grey);
-                        break;
-                    case CHAR_MONSTER:
-                        draw_rect(i, j, &yellow);
-                        break;
-                    case CHAR_PLAYER:
-                        draw_rect(i, j, &cyan);
-                        break;
-                    case CHAR_FINISH:
-                        draw_rect(i, j, &red);
-                        break;
-                }
+            switch (grid[i][j]) {
+                case CHAR_WALL:
+                    draw_rect(i, j, &grey);
+                    break;
+                case CHAR_MONSTER:
+                    draw_rect(i, j, &yellow);
+                    break;
+                case CHAR_PLAYER:
+                    draw_rect(i, j, &cyan);
+                    break;
+                case CHAR_FINISH:
+                    draw_rect(i, j, &red);
+                    break;
             }
         }
     }
@@ -210,12 +206,11 @@ void render() {
     SDL_SetRenderDrawColor(gpu.renderer, 0x00, 0x00, 0x00, 0x00);
     SDL_RenderClear(gpu.renderer);
 
+    draw_grid();
+
     if (!game_end) {
-        draw_grid();
         draw_player();
         draw_monster();
-    } else {
-        draw_grid();
     }
 
     // Draw to screen.
