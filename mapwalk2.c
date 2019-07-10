@@ -15,6 +15,9 @@
 #define CHAR_MONSTER  'M'
 #define CHAR_FINISH   'F'
 
+#define CHAR_WIN      CHAR_PLAYER
+#define CHAR_LOSE     CHAR_MONSTER
+
 typedef struct {
     int dx,dy;
 } Move;
@@ -122,6 +125,11 @@ const Move* inv_move(const Move* m) {
         return &mv_up;
 }
 
+void fin(char c) {
+    memset(grid, c, sizeof grid);
+    game_end = true;
+}
+
 void update_player(const Move* m) {
     int x = player.x + m->dx;
     int y = player.y + m->dy;
@@ -130,8 +138,7 @@ void update_player(const Move* m) {
         case CHAR_WALL:
             break; // do nothing.
         case CHAR_FINISH:
-            game_end = true; // Win!
-            memset(grid, CHAR_PLAYER, sizeof grid);
+            fin(CHAR_WIN);
             break;
         case CHAR_EMPTY:
             player.x = x;
@@ -170,23 +177,28 @@ void draw_rect(int col, int row, const Colour* c) {
     SDL_RenderFillRect(gpu.renderer, &r);
 }
 
+const Colour* char_colour(char c) {
+    switch (c) {
+        case CHAR_WALL:
+            return &grey;
+        case CHAR_LOSE:
+            return &yellow;
+        case CHAR_WIN:
+            return &cyan;
+        case CHAR_FINISH:
+            return &red;
+        default:
+            return NULL;
+    }
+}
+
 void draw_grid() {
     for (int i=0; i < COLS; i++) {
         for (int j=0; j < ROWS; j++) {
-            switch (grid[i][j]) {
-                case CHAR_WALL:
-                    draw_rect(i, j, &grey);
-                    break;
-                case CHAR_MONSTER:
-                    draw_rect(i, j, &yellow);
-                    break;
-                case CHAR_PLAYER:
-                    draw_rect(i, j, &cyan);
-                    break;
-                case CHAR_FINISH:
-                    draw_rect(i, j, &red);
-                    break;
-            }
+            const Colour* c = char_colour(grid[i][j]);
+
+            if (c != NULL)
+                draw_rect(i,j,c);
         }
     }
 }
@@ -236,8 +248,7 @@ void move_monster() {
 
 void check_collision() {
     if (monster.x == player.x && monster.y == player.y) {
-        game_end = true; // Lose!
-        memset(grid, CHAR_MONSTER, sizeof grid);
+        fin(CHAR_LOSE);
     }
 }
 
@@ -247,7 +258,7 @@ void update_world() {
 }
 
 void init_gpu() {
-    printf("Initialising GPU ...\n");
+    printf("Initialising display ...\n");
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         puts(SDL_GetError());
