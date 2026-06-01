@@ -67,11 +67,13 @@ void init_game(void) {
                     grid[c][r] = cell;
                     break;
                 case CHAR_PLAYER:
+                    grid[c][r] = CHAR_EMPTY;
                     player.x = c + 0.5f;
                     player.y = r + 0.5f;
                     player.angle = 0.0f;
                     break;
                 case CHAR_MONSTER:
+                    grid[c][r] = CHAR_EMPTY;
                     monster.x = c;
                     monster.y = r;
                     monster.dir = NULL;
